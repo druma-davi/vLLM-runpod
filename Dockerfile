@@ -1,38 +1,25 @@
-# 1. Base Image: Use the official vLLM image
+# Use the official vLLM image as base (it has python, torch, and vllm pre-installed)
 FROM vllm/vllm-openai:latest
 
-# 2. Setup Work Directory
 WORKDIR /app
 
-# 3. Install dependencies for faster downloading
-RUN pip install uv && \
-    uv pip install --system huggingface_hub[cli]
+# Install the RunPod SDK
+RUN pip install runpod
 
-# 4. Download the Model (Qwen 4B)
-# We exclude .bin files to ensure we use the faster safetensors
-RUN huggingface-cli download Qwen/Qwen3-4B-Thinking-2507 \
+# Download the model during build (Baking it in)
+RUN pip install huggingface_hub[cli] && \
+    huggingface-cli download Qwen/Qwen3-4B-Thinking-2507 \
     --local-dir /app/model \
     --local-dir-use-symlinks False \
     --exclude "*.bin" "*.pth"
 
-# 5. Environment Variables
+# Copy your python script
+COPY handler.py /app/handler.py
+
+EXPOSE 8080
+
+# ENVIRONMENT VARIABLES
 ENV MODEL="/app/model"
-ENV SERVED_MODEL_NAME="qwen3"
-ENV VLLM_ENFORCE_EAGER="true"
-ENV VLLM_NO_USAGE_STATS="1"
 
-# 6. Entrypoint
-ENTRYPOINT ["python3", "-m", "vllm.entrypoints.openai.api_server"]
-
-# 7. COMMAND (THE FIX IS HERE)
-# --max-model-len 8192:  Prevents the 36GB RAM crash.
-# --dtype half:          Loads model instantly in FP16.
-# --enforce-eager:       Skips slow startup checks.
-
-CMD ["--model", "/app/model", \
-     "--served-model-name", "qwen3", \
-     "--trust-remote-code", \
-     "--dtype", "half", \
-     "--max-model-len", "8096", \
-     "--gpu-memory-utilization", "0.95", \
-     "--enforce-eager"]
+# Run the handler (Not the web server!)
+CMD ["python3", "/app/handler.py"]
