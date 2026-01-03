@@ -33,6 +33,6 @@ CMD ["--model", "/app/model", \
      "--served-model-name", "qwen3", \
      "--trust-remote-code", \
      "--dtype", "half", \
-     "--max-model-len", "16384", \
+     "--max-model-len", "8096", \
      "--gpu-memory-utilization", "0.95", \
      "--enforce-eager"]
