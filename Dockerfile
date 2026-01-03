@@ -1,28 +1,38 @@
-# 1. Use the official vLLM image (highly optimized for speed)
+# 1. Base Image: Use the official vLLM image
 FROM vllm/vllm-openai:latest
 
-# 2. Set the working directory
+# 2. Setup Work Directory
 WORKDIR /app
 
-# 3. Install Hugging Face CLI to download the model
-RUN pip install --upgrade pip && \
-    pip install huggingface_hub[cli]
+# 3. Install dependencies for faster downloading
+RUN pip install uv && \
+    uv pip install --system huggingface_hub[cli]
 
-# 4. Download the model weights inside the image
-# This is the "Baking" step. The model becomes part of the file system.
-# We download to /app/model
+# 4. Download the Model (Qwen 4B)
+# We exclude .bin files to ensure we use the faster safetensors
 RUN huggingface-cli download Qwen/Qwen3-4B-Thinking-2507 \
     --local-dir /app/model \
-    --local-dir-use-symlinks False
+    --local-dir-use-symlinks False \
+    --exclude "*.bin" "*.pth"
 
-# 5. Set Environment Variables for vLLM
-# These tell vLLM where the model is and how to treat it.
+# 5. Environment Variables
 ENV MODEL="/app/model"
 ENV SERVED_MODEL_NAME="qwen3"
-ENV TRUST_REMOTE_CODE="True"
+ENV VLLM_ENFORCE_EAGER="true"
+ENV VLLM_NO_USAGE_STATS="1"
 
-# 6. Define the start command
-# We use the vLLM OpenAI compatible server
-# We force float16 for speed (or use --quantization bitsandbytes if you strictly need 4bit to save RAM)
+# 6. Entrypoint
 ENTRYPOINT ["python3", "-m", "vllm.entrypoints.openai.api_server"]
-CMD ["--model", "/app/model", "--served-model-name", "qwen3", "--trust-remote-code", "--dtype", "half"]
+
+# 7. COMMAND (THE FIX IS HERE)
+# --max-model-len 8192:  Prevents the 36GB RAM crash.
+# --dtype half:          Loads model instantly in FP16.
+# --enforce-eager:       Skips slow startup checks.
+
+CMD ["--model", "/app/model", \
+     "--served-model-name", "qwen3", \
+     "--trust-remote-code", \
+     "--dtype", "half", \
+     "--max-model-len", "16384", \
+     "--gpu-memory-utilization", "0.95", \
+     "--enforce-eager"]
