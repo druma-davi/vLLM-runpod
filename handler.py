@@ -1,58 +1,39 @@
 import runpod
 from vllm import LLM, SamplingParams
 
-# 1. GLOBAL INITIALIZATION
-# We load the model once when the container starts, just like your sentiment code.
-print("--- Loading Qwen Model ---")
+# INITIALIZE AWQ MODEL
+print("--- Loading AWQ Model (Fast Boot) ---")
 llm = LLM(
     model="/app/model",
     trust_remote_code=True,
-    dtype="half",
-    max_model_len=8192,           # Fixes the memory crash
-    gpu_memory_utilization=0.95,  # Maximizes GPU usage
-    enforce_eager=True            # Fast boot
+    quantization="awq",           # CRITICAL: Native 4-bit support
+    dtype="half",                 # Works best with AWQ on NVIDIA
+    max_model_len=19384,          # 16k context window
+    gpu_memory_utilization=0.9,   # Plenty of room for KV cache
+    enforce_eager=True            # Skip warmup for instant boot
 )
-print("--- Model Loaded Successfully ---")
+print("--- AWQ Model Ready ---")
 
 def handler(job):
-    """
-    This function runs every time you send a request.
-    """
-    job_input = job["input"]
-    
-    # Get the prompt from the user input
-    # Supporting both "prompt" (standard) and "messages" (chat format)
+    job_input = job.get("input", {})
     prompt = job_input.get("prompt")
     messages = job_input.get("messages")
-    
+
+    # ChatML formatting for Qwen
     if messages and not prompt:
-        # Simple chat formatting
-        prompt = ""
-        for msg in messages:
-            prompt += f"<|im_start|>{msg['role']}\n{msg['content']}<|im_end|>\n"
+        prompt = "".join([f"<|im_start|>{m['role']}\n{m['content']}<|im_end|>\n" for m in messages])
         prompt += "<|im_start|>assistant\n"
 
-    if not prompt:
-        return {"error": "Please provide a 'prompt' or 'messages' in the input."}
+    if not prompt: return {"error": "No input"}
 
-    # Setup generation parameters
     sampling_params = SamplingParams(
-        temperature=job_input.get("temperature", 0.7),
+        temperature=job_input.get("temperature", 0.6),
         top_p=0.95,
-        max_tokens=job_input.get("max_tokens", 500)
+        max_tokens=job_input.get("max_tokens", 1000),
+        stop=["<|im_end|>"]
     )
 
-    # Run Inference (Fast vLLM engine)
     outputs = llm.generate([prompt], sampling_params)
-    generated_text = outputs[0].outputs[0].text
+    return {"text": outputs[0].outputs[0].text}
 
-    return {
-        "text": generated_text,
-        "usage": {
-            "input_tokens": len(outputs[0].prompt_token_ids),
-            "output_tokens": len(outputs[0].outputs[0].token_ids)
-        }
-    }
-
-# Start the RunPod worker
 runpod.serverless.start({"handler": handler})

@@ -1,27 +1,25 @@
-# 1. Base Image
+# Use the official vLLM image as base (it has python, torch, and vllm pre-installed)
 FROM vllm/vllm-openai:latest
 
 WORKDIR /app
 
-# 2. Install RunPod SDK
+# Install the RunPod SDK
 RUN pip install runpod
 
-# 3. Download Model (Baking it in)
+# BAKE IN THE AWQ WEIGHTS (3.44GB)
 RUN pip install huggingface_hub[cli] && \
-    huggingface-cli download Qwen/Qwen3-4B-Thinking-2507 \
+    huggingface-cli download cyankiwi/Qwen3-4B-Thinking-2507-AWQ-4bit \
     --local-dir /app/model \
-    --local-dir-use-symlinks False \
-    --exclude "*.bin" "*.pth"
+    --local-dir-use-symlinks False
 
-# 4. Copy your script
+# Copy your python script
 COPY handler.py /app/handler.py
 
-# 5. Environment Variables
+EXPOSE 8080
+
+# ENVIRONMENT VARIABLES
 ENV MODEL="/app/model"
 
-# 6. CRITICAL FIX: Reset the Entrypoint
-# We must override the base image's entrypoint so it runs OUR command, not vLLM's server.
+# Run the handler (Not the web server!)
 ENTRYPOINT []
-
-# 7. Run your handler
 CMD ["python3", "/app/handler.py"]
