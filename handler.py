@@ -6,9 +6,9 @@ print("--- Loading AWQ Model (Fast Boot) ---")
 llm = LLM(
     model="/app/model",
     trust_remote_code=True,
-    quantization="compressed-tensors",           # CRITICAL: Native 4-bit support
-    dtype="half",                 # Works best with AWQ on NVIDIA
-    max_model_len=19384,          # 16k context window
+    quantization="fo8",           # CRITICAL: Native 4-bit support
+    # dtype="half",                 # Works best with AWQ on NVIDIA
+    max_model_len=24576,          # 16k context window
     gpu_memory_utilization=0.9,   # Plenty of room for KV cache
     enforce_eager=True            # Skip warmup for instant boot
 )
@@ -29,7 +29,7 @@ def handler(job):
     sampling_params = SamplingParams(
         temperature=job_input.get("temperature", 0.6),
         top_p=0.95,
-        max_tokens=job_input.get("max_tokens", 1000),
+        max_tokens=job_input.get("max_tokens", 10000),
         stop=["<|im_end|>"]
     )
 
@@ -38,3 +38,4 @@ def handler(job):
 
 
 runpod.serverless.start({"handler": handler})
+
