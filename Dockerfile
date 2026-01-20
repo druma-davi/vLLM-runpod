@@ -8,7 +8,7 @@ RUN pip install runpod
 
 # BAKE IN THE AWQ WEIGHTS (3.44GB)
 RUN pip install huggingface_hub[cli] && \
-    huggingface-cli download cyankiwi/Qwen3-4B-Thinking-2507-AWQ-4bit \
+    huggingface-cli download Qwen/Qwen3-4B-Thinking-2507-FP8 \
     --local-dir /app/model \
     --local-dir-use-symlinks False
 
