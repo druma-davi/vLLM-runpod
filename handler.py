@@ -6,7 +6,7 @@ print("--- Loading AWQ Model (Fast Boot) ---")
 llm = LLM(
     model="/app/model",
     trust_remote_code=True,
-    quantization="fo8",           # CRITICAL: Native 4-bit support
+    quantization="fp8",           # CRITICAL: Native 4-bit support
     # dtype="half",                 # Works best with AWQ on NVIDIA
     max_model_len=24576,          # 16k context window
     gpu_memory_utilization=0.9,   # Plenty of room for KV cache
@@ -38,4 +38,5 @@ def handler(job):
 
 
 runpod.serverless.start({"handler": handler})
+
 
